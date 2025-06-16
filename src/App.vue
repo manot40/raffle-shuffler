@@ -60,7 +60,7 @@ function startSpinning() {
     // Buat tween individual dan simpan referensinya
     cachedTweens.push(
       animate(proxy, {
-        y: `${direction}${entryHeight * 15}`,
+        y: `${direction}${entryHeight * 10}`,
         loop: true,
         ease: 'inSine',
         duration: ms(utils.random(3, 6, 2)),
