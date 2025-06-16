@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue';
 
-import { gsap } from 'gsap';
+import { animate, utils, createTimeline, type JSAnimation } from 'animejs';
+
 import { CHARACTERS, NUM_OF_DIGITS } from './const';
 
 import Characters from './components/characters.vue';
@@ -14,7 +15,9 @@ const isIdling = ref(true);
 const isSpinning = ref(false);
 const isRevealing = ref(false);
 
-const cachedTweens: Array<InstanceType<typeof gsap.core.Tween>> = [];
+const cachedTweens: Array<JSAnimation> = [];
+
+const ms = (seconds: number) => seconds * 1000;
 
 function calculateCharHeight() {
     const childEl = reels.value[0] && reels.value[0].children[0];
@@ -24,7 +27,7 @@ function calculateCharHeight() {
 function reset() {
     // Hentikan setiap animasi putaran secara individual
     if (cachedTweens.length) {
-        cachedTweens.forEach((tween) => tween.kill());
+        cachedTweens.forEach((tween) => tween.cancel());
         cachedTweens.length = 0;
     }
     if (!charHeight || charHeight.value === 0) {
@@ -37,7 +40,7 @@ function reset() {
 
     const zeroIndexInMiddleSet = CHARACTERS.length + CHARACTERS.indexOf('0');
     const initialY = -zeroIndexInMiddleSet * charHeight.value;
-    gsap.set(reels.value, { y: initialY });
+    utils.set(reels.value, { y: initialY });
 }
 
 function generateRandomCode() {
@@ -59,17 +62,19 @@ function startSpinning() {
 
     reels.value.forEach((reel) => {
         const singleSetHeight = CHARACTERS.length * charHeight.value;
-        const wrap = gsap.utils.wrap(-singleSetHeight * 2, -singleSetHeight);
-        const proxy = { y: gsap.getProperty(reel, 'y') as number };
+        const wrap = utils.wrap(-singleSetHeight * 2, -singleSetHeight);
+        const proxy = { y: +utils.get(reel, 'y') };
 
         // Buat tween individual dan simpan referensinya
-        const tween = gsap.to(proxy, {
-            y: (Math.random() < 0.5 ? '-=' : '+=') + singleSetHeight * 15,
-            duration: 3 + Math.min(Math.random(), 0.65) * 2,
-            ease: 'sine.in',
-            repeat: -1,
+        const tween = animate(proxy, {
+            loop: true,
+            y: {
+                to: (Math.random() < 0.5 ? '-=' : '+=') + singleSetHeight * 15,
+                ease: 'inSine',
+                duration: ms(3 + Math.min(Math.random(), 0.65) * 2),
+            },
             onUpdate() {
-                gsap.set(reel, { y: wrap(proxy.y) });
+                utils.set(reel, { y: wrap(proxy.y) });
             },
         });
         cachedTweens.push(tween);
@@ -84,7 +89,7 @@ function revealCode() {
     isRevealing.value = true;
     const newCode = generateRandomCode();
 
-    const revealTl = gsap.timeline({
+    const revealTl = createTimeline({
         onComplete() {
             code.value = newCode;
             isRevealing.value = false;
@@ -97,17 +102,16 @@ function revealCode() {
         const targetIndex = CHARACTERS.length + CHARACTERS.indexOf(targetChar);
         const targetY = -targetIndex * charHeight.value;
 
-        const revealTime = 0.5 + index * 1.0; // Waktu mulai pendaratan untuk setiap digit
+        const revealTime = ms(0.5 + index * 1.0); // Waktu mulai pendaratan untuk setiap digit
 
-        const killTween = () => {
-            cachedTweens[index]?.kill();
-        };
-
-        // Hentikan tween putaran pada waktu yang tepat
-        revealTl.call(killTween, undefined, revealTime);
-        // Mulai animasi pendaratan pada waktu yang sama
-        revealTl.to(reel, { y: targetY, duration: 1.2, ease: 'elastic.out' }, revealTime);
+        revealTl
+            // Hentikan tween putaran pada waktu yang tepat
+            .call(() => cachedTweens[index]?.cancel(), revealTime)
+            // Mulai animasi pendaratan pada waktu yang sama
+            .add(reel, { y: { to: targetY, duration: ms(1.2), ease: 'outElastic' } }, revealTime);
     });
+
+    revealTl.play();
 }
 
 onMounted(() => {

@@ -10,7 +10,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('gsap')) return 'gsap';
+          if (id.includes('animejs')) return 'animejs';
         },
       },
     },
