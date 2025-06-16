@@ -44,15 +44,6 @@ function cleanup() {
   cachedTweens.length = 0;
 }
 
-function generateRandomCode() {
-  let code = '';
-  for (let i = 0; i < NUM_OF_DIGITS; i++) {
-    const randomIndex = Math.floor(Math.random() * CHARACTERS.length);
-    code += CHARACTERS[randomIndex];
-  }
-  return code;
-}
-
 function startSpinning() {
   if (isSpinning.value || isRevealing.value) return;
   isSpinning.value = true;
@@ -64,7 +55,7 @@ function startSpinning() {
     const wrap = utils.wrap(-entryHeight * 2, -entryHeight);
 
     const proxy = { y: +utils.get(reel, 'y') };
-    const direction = Math.random() < 0.5 ? '-=' : '+=';
+    const direction = utils.randomPick(['-=', '+=']);
 
     // Buat tween individual dan simpan referensinya
     cachedTweens.push(
@@ -72,7 +63,7 @@ function startSpinning() {
         y: `${direction}${entryHeight * 15}`,
         loop: true,
         ease: 'inSine',
-        duration: ms(3 + Math.min(Math.random(), 0.65) * 2),
+        duration: ms(utils.random(3, 6, 2)),
         onUpdate: () => utils.set(reel, { y: wrap(proxy.y) }),
       })
     );
@@ -103,6 +94,13 @@ function revealCode() {
     const onBegin = () => cachedTweens[i]?.complete();
     revealTl.add(reel, { y, ease: 'outElastic', duration: ms(1.2), onBegin }, revealTime);
   });
+}
+function generateRandomCode() {
+  let code = '';
+  for (let i = 0; i < NUM_OF_DIGITS; i++) {
+    code += utils.randomPick(CHARACTERS);
+  }
+  return code;
 }
 
 onMounted(() => {
