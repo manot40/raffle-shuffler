@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, shallowRef } from 'vue';
 
 import { animate, createTimeline, utils, type JSAnimation } from 'animejs';
 
@@ -15,6 +15,8 @@ const isIdling = ref(true);
 const isSpinning = ref(false);
 const isRevealing = ref(false);
 const isResetting = ref(false);
+
+const skipReveal = shallowRef<() => void>();
 
 const cachedTweens: Array<JSAnimation> = [];
 const ms = (seconds: number) => seconds * 1000;
@@ -50,14 +52,12 @@ function startSpinning() {
   isIdling.value = false;
   code.value = '';
 
-  reels.value.forEach((reel) => {
-    const entryHeight = CHARACTERS.length * charHeight.value;
-    const wrap = utils.wrap(-entryHeight * 2, -entryHeight);
+  const entryHeight = CHARACTERS.length * charHeight.value;
+  const wrap = utils.wrap(-entryHeight * 2, -entryHeight);
 
+  reels.value.forEach((reel) => {
     const proxy = { y: +utils.get(reel, 'y') };
     const direction = utils.randomPick(['-=', '+=']);
-
-    // Buat tween individual dan simpan referensinya
     cachedTweens.push(
       animate(proxy, {
         y: `${direction}${entryHeight * 10}`,
@@ -80,6 +80,7 @@ function revealCode() {
   const revealTl = createTimeline({
     onComplete() {
       code.value = newCode;
+      skipReveal.value = undefined;
       isRevealing.value = false;
     },
   });
@@ -91,9 +92,11 @@ function revealCode() {
 
     const revealTime = ms(0.5 + i * 1.0);
     // Hentikan tween pada saat animasi pendaratan berakhir
-    const onBegin = () => cachedTweens[i]?.complete();
-    revealTl.add(reel, { y, ease: 'outElastic', duration: ms(1.2), onBegin }, revealTime);
+    const onBegin = () => cachedTweens[i]?.cancel();
+    revealTl.add(reel, { y, ease: 'outElastic', duration: ms(3), onBegin }, revealTime);
   });
+
+  skipReveal.value = () => revealTl.complete();
 }
 function generateRandomCode() {
   let code = '';
@@ -111,7 +114,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gray-900 text-white">
+  <div class="flex h-dvh items-center justify-center bg-gray-900 text-white">
     <div class="mx-auto w-full max-w-4xl p-4">
       <div class="flex flex-col items-center justify-center space-y-16">
         <h1 class="text-center text-4xl font-bold text-cyan-400 md:text-5xl">Pengacak Kode Undian</h1>
@@ -127,8 +130,8 @@ onMounted(() => {
           </button>
           <button
             v-else-if="!code"
-            @click="revealCode"
-            :disabled="isResetting || isRevealing || !!code"
+            @click="skipReveal ? skipReveal() : revealCode()"
+            :disabled="isResetting || !!code"
             class="transform rounded-lg bg-yellow-500 px-8 py-4 text-xl font-bold text-gray-900 shadow-lg transition-transform duration-200 hover:scale-105 hover:bg-yellow-400 disabled:cursor-not-allowed disabled:scale-100 disabled:bg-gray-600">
             Buka Kode
           </button>
@@ -141,10 +144,10 @@ onMounted(() => {
           </button>
         </div>
 
-        <div v-if="code" class="mt-6 w-full rounded-lg bg-gray-800 p-4 text-center shadow-inner">
+        <div :class="{ invisible: !code }" class="w-xs rounded-lg bg-gray-800 p-4 text-center shadow-inner">
           <h2 class="mb-2 text-lg text-gray-400">Kode Undian Terpilih:</h2>
           <p class="font-mono text-3xl font-bold tracking-widest text-yellow-400 md:text-4xl">
-            {{ code }}
+            {{ code || '000000' }}
           </p>
         </div>
       </div>
